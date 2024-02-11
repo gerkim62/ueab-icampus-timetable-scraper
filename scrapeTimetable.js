@@ -1,5 +1,6 @@
 const puppeteer = require("puppeteer");
 const HtmlTableToJson = require("html-table-to-json");
+require("dotenv").config();
 
 // URLS
 const ICAMPUS_HOME_URL = "https://icampus.ueab.ac.ke/";
@@ -19,7 +20,18 @@ const LOGOUT_BUTTON_SELECTOR = "#ucHeader_hyLog";
 
 async function scrapeTimetable(username, password) {
   const browserLaunchStartTime = Date.now();
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({
+    args: [
+      "--disable-setuid-sandbox",
+      "--no-sandbox",
+      "--single-process",
+      "--no-zygote",
+    ],
+    executablePath:
+      process.env.NODE_ENV === "production"
+        ? process.env.PUPPETEER_EXECUTABLE_PATH
+        : puppeteer.executablePath(),
+  });
   const browserLaunchEndTime = Date.now();
 
   const loginStartTime = Date.now();
