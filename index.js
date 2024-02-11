@@ -1,8 +1,11 @@
 const express = require("express");
 const scrapeTimetable = require("./scrapeTimetable");
+const cors = require("cors");
 const errorMessages = require("./errorMessages");
 const app = express();
 app.use(express.json());
+
+app.use(cors());
 const PORT = process.env.PORT || 3000;
 
 app.get("/", (req, res) => {
