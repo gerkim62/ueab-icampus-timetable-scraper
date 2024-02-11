@@ -1,0 +1,17 @@
+{
+  "name": "icampus-scrape",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "html-table-to-json": "^1.0.0",
+    "puppeteer": "^22.0.0"
+  }
+}
