@@ -18,12 +18,21 @@ app.post("/api/scrape_timetable", async (req, res) => {
 
   // Scrape the timetable here
   try {
-    const timetable = await scrapeTimetable(username, password);
+    const result = await scrapeTimetable(username, password);
 
-    res.send(timetable);
+    res.status(result?.error?.code || 200).send(result);
   } catch (error) {
     //TODO: fix how this error handling is done
-    return res.status(500).send(error.message || errorMessages.serverError);
+    return res.status(500).send({
+      error: {
+        exists: true,
+        code: 500,
+        message:
+          "An error occurred while trying to scrape the timetable." +
+          error?.message,
+        possible_cause: "The server might be experiencing some issues.",
+      },
+    });
   }
 });
 
