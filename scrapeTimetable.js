@@ -35,7 +35,8 @@ const CANT_VERIFY_USERNAME_ERROR_MESSAGE =
 async function scrapeTimetable(username, password) {
   const browserLaunchStartTime = Date.now();
   const browser = await puppeteer.launch({
-    headless: false,
+    // ONLY FOR DEVELOPMENT
+    headless: process.env.NODE_ENV === "production" ? true : false,
     args: [
       "--disable-setuid-sandbox",
       "--no-sandbox",
