@@ -36,7 +36,7 @@ async function scrapeTimetable(username, password) {
   const browserLaunchStartTime = Date.now();
   const browser = await puppeteer.launch({
     // ONLY FOR DEVELOPMENT
-    headless: process.env.NODE_ENV === "production" ? true : false,
+    headless: true,
     args: [
       "--disable-setuid-sandbox",
       "--no-sandbox",
