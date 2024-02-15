@@ -66,6 +66,8 @@ async function scrapeTimetable(username, password) {
 
     console.log("typed username and clicked authenticate");
 
+    console.log(page.content());
+
     // handle user does not exist here, done!
     const errorMessage = await page.evaluate((ERROR_MESSAGE_SELECTOR) => {
       return document.querySelector(ERROR_MESSAGE_SELECTOR)?.innerText;
