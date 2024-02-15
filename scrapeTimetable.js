@@ -33,6 +33,7 @@ const CANT_VERIFY_USERNAME_ERROR_MESSAGE =
   "User name or password could not be verified";
 
 async function scrapeTimetable(username, password) {
+  console.log("scraper started");
   const browserLaunchStartTime = Date.now();
   const browser = await puppeteer.launch({
     // ONLY FOR DEVELOPMENT
@@ -48,17 +49,22 @@ async function scrapeTimetable(username, password) {
         ? process.env.PUPPETEER_EXECUTABLE_PATH
         : puppeteer.executablePath(),
   });
+  console.log("browser launched");
 
   try {
     const browserLaunchEndTime = Date.now();
 
     const loginStartTime = Date.now();
     const page = await browser.newPage();
+    console.log("did newPage()");
 
     await page.goto(ICAMPUS_HOME_URL);
+    console.log("visited ICAMPUS_HOME_URL");
 
     await page.type(USERNAME_SELECTOR, username);
     await page.click(AUTHENTICATE_BUTTON_SELECTOR);
+
+    console.log("typed username and clicked authenticate");
 
     // handle user does not exist here, done!
     const errorMessage = await page.evaluate((ERROR_MESSAGE_SELECTOR) => {
@@ -94,6 +100,8 @@ async function scrapeTimetable(username, password) {
     await page.waitForSelector(PASSWORD_SELECTOR);
     await page.type(PASSWORD_SELECTOR, password);
     await page.click(LOGIN_BUTTON_SELECTOR);
+
+    console.log("typed password and clicked login");
 
     // await page.waitForSelector(INVALID_LOGIN_ERROR_SELECTOR);
     await page.waitForNetworkIdle();
@@ -148,6 +156,8 @@ async function scrapeTimetable(username, password) {
       },
       ICAMPUS_TIMETABLE_URL
     );
+
+    console.log("Fetched timetable page");
     const fetchTimetableEndTime = Date.now();
 
     const allTables = HtmlTableToJson.parse(timetablePageHtml);
