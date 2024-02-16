@@ -32,7 +32,7 @@ app.post("/api/scrape_timetable", async (req, res) => {
         exists: true,
         code: 500,
         message:
-          "An error occurred while trying to scrape the timetable." +
+          "An error occurred while trying to scrape the timetable. " +
           error?.message,
         possible_cause: "The server might be experiencing some issues.",
       },

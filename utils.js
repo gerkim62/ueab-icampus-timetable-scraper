@@ -20,6 +20,7 @@ async function saveCookies(username, cookies) {
 }
 
 async function retrieveCookies(username) {
+  // return []
   const url = `https://jsonbin.org/${ownerUsername}/icampus-cookies/${username}`;
 
   const res = await fetch(url, {

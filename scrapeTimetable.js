@@ -254,13 +254,20 @@ async function scrapeTimetable(username, password) {
     const timetable = allTables.results[allTables.results.length - 1] || [];
 
     if (timetable.length === 0) {
+      if (cookies) {
+        console.log("cookies could be invalid since got empty array");
+
+        await deleteCookies(username).catch((error) => {
+          console.log("could not delete cookies", error);
+        });
+        return await scrapeTimetable(username, password);
+      }
       return {
         error: {
           exists: true,
           code: 500,
           message: "The timetable could not be scraped.",
-          possible_cause:
-            "iCampus may be Login issues.",
+          possible_cause: "Server failed to login to iCampus.",
         },
       };
     }
