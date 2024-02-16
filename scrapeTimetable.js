@@ -205,13 +205,12 @@ async function scrapeTimetable(username, password) {
       const cookiesObject = await page.cookies();
 
       fs.writeFile(
-        `cookies/${username}.json`,
+        `./cookies/${username}.json`,
         JSON.stringify(cookiesObject),
         function (err) {
           if (err) {
             console.log("The session could not be saved.", err);
-          }
-          console.log("The session has been saved successfully.");
+          } else console.log("The session has been saved successfully.");
         }
       );
     }
