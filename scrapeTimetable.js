@@ -251,7 +251,19 @@ async function scrapeTimetable(username, password) {
     console.log("All tables: ", allTables.results.length);
 
     //noticed the last table is the actual timetable
-    const timetable = allTables.results[allTables.results.length - 1];
+    const timetable = allTables.results[allTables.results.length - 1] || [];
+
+    if (timetable.length === 0) {
+      return {
+        error: {
+          exists: true,
+          code: 500,
+          message: "The timetable could not be scraped.",
+          possible_cause:
+            "iCampus has issues or my server is experiencing some issues.",
+        },
+      };
+    }
 
     //   console.log(JSON.stringify(timetable, null, 2));
 
