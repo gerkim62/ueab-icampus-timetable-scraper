@@ -25,6 +25,7 @@ app.post("/api/scrape_timetable", async (req, res) => {
 
     res.status(result?.error?.code || 200).send(result);
   } catch (error) {
+    console.error(error);
     //TODO: fix how this error handling is done
     return res.status(500).send({
       error: {

@@ -1,12 +1,20 @@
 const puppeteer = require("puppeteer");
 const HtmlTableToJson = require("html-table-to-json");
+const fs = require("fs");
 require("dotenv").config();
+
+const inDevelopment = process.env.NODE_ENV === "development";
+
+console.log("inDevelopment: ", inDevelopment);
 
 // URLS
 const ICAMPUS_HOME_URL = "https://icampus.ueab.ac.ke/";
 const ICAMPUS_TIMETABLE_URL =
   "https://icampus.ueab.ac.ke/iStudent/Auth/Classes/TimeTa";
 const ICAMPUS_ACCOUNT_LOCKED_URL = "https://icampus.ueab.ac.ke/Account/Lockout";
+
+const ICAMPUS_LOGGED_IN_URL =
+  "https://icampus.ueab.ac.ke/iStudent/Auth/Default";
 
 // SELECTORS
 const USERNAME_SELECTOR = "#txtuser";
@@ -26,6 +34,8 @@ const INVALID_LOGIN_ERROR_SELECTOR =
 
 const LOCKED_OUT_SELECTOR = `form[action='./Lockout']`;
 
+const USER_FULLNAME_SELECTOR = "#ucHeader_lblUser";
+
 //CONSTANTS
 const USER_NOT_EXIST_ERROR_MESSAGE = "User ID Does Not Exist";
 const INVALID_LOGIN_ERROR_MESSAGE = "Invalid login attempt";
@@ -34,10 +44,17 @@ const CANT_VERIFY_USERNAME_ERROR_MESSAGE =
 
 async function scrapeTimetable(username, password) {
   console.log("scraper started");
+  let cookies = null;
+  try {
+    cookies = JSON.parse(fs.readFileSync(`cookies/${username}.json`, "utf8"));
+    console.log("cookies: ", cookies);
+  } catch (error) {
+    console.log("No cookies available", error);
+  }
   const browserLaunchStartTime = Date.now();
   const browser = await puppeteer.launch({
     // ONLY FOR DEVELOPMENT
-    headless: true,
+    headless: !inDevelopment,
     args: [
       "--disable-setuid-sandbox",
       "--no-sandbox",
@@ -52,102 +69,164 @@ async function scrapeTimetable(username, password) {
   console.log("browser launched");
 
   try {
+    let loginEndTime;
+
     const browserLaunchEndTime = Date.now();
 
     const loginStartTime = Date.now();
     const page = await browser.newPage();
     console.log("did newPage()");
 
-    await page.goto(ICAMPUS_HOME_URL);
-    console.log("visited ICAMPUS_HOME_URL");
+    // Define the resource types you want to block
+    const blockedResourceTypes = [
+      "stylesheet",
+      "script",
+      "image",
+      "other",
+      "font",
+    ];
 
-    await page.type(USERNAME_SELECTOR, username);
-    await page.click(AUTHENTICATE_BUTTON_SELECTOR);
+    // Intercept network requests
+    await page.setRequestInterception(true);
 
-    console.log("typed username and clicked authenticate");
+    page.on("request", async (request) => {
+      const resourceType = request.resourceType();
 
-    console.log(page.content());
+      console.log("resourceType: ", resourceType);
 
-    // handle user does not exist here, done!
-    const errorMessage = await page.evaluate((ERROR_MESSAGE_SELECTOR) => {
-      return document.querySelector(ERROR_MESSAGE_SELECTOR)?.innerText;
-    }, ERROR_MESSAGE_SELECTOR);
+      // Block the request if its resource type is in the blockedResourceTypes array
+      if (blockedResourceTypes.includes(resourceType)) {
+        request.abort();
+      } else {
+        const startTime = Date.now();
+        await request.continue();
+        console.log(
+          `not blocking ${resourceType}, ${request.url()} (${
+            Date.now() - startTime
+          }ms)`
+        );
+      }
+    });
 
-    console.log("Error message: ", errorMessage);
+    if (!cookies) {
+      console.log("no cookies, manual login");
+      await page.goto(ICAMPUS_HOME_URL);
+      console.log("visited ICAMPUS_HOME_URL");
 
-    if (errorMessage) {
-      await browser.close();
-      return {
-        error: {
-          code: errorMessage === USER_NOT_EXIST_ERROR_MESSAGE ? 404 : 500,
-          exists: true,
-          message: errorMessage,
-          possible_cause:
-            "The username you entered does not exist or is incorrect.",
+      await page.type(USERNAME_SELECTOR, username);
+      await page.click(AUTHENTICATE_BUTTON_SELECTOR);
+
+      console.log("typed username and clicked authenticate");
+
+      // console.log(await page.content());
+
+      // handle user does not exist here, done!
+      const errorMessage = await page.evaluate((ERROR_MESSAGE_SELECTOR) => {
+        return document.querySelector(ERROR_MESSAGE_SELECTOR)?.innerText;
+      }, ERROR_MESSAGE_SELECTOR);
+
+      console.log("Error message: ", errorMessage);
+
+      if (errorMessage) {
+        await browser.close();
+        return {
+          error: {
+            code: errorMessage === USER_NOT_EXIST_ERROR_MESSAGE ? 404 : 500,
+            exists: true,
+            message: errorMessage,
+            possible_cause:
+              "The username you entered does not exist or is incorrect.",
+          },
+        };
+      }
+
+      const lockedOut = await page.evaluate((LOCKED_OUT_SELECTOR) => {
+        return document.querySelector(LOCKED_OUT_SELECTOR)?.innerText;
+      }, LOCKED_OUT_SELECTOR);
+
+      console.log("Locked out: ", lockedOut);
+      const currentUrl = page.url();
+      console.log("Current URL: ", currentUrl);
+
+      // Check if the account is locked
+
+      //   await page.waitForNavigation();
+      await page.waitForSelector(PASSWORD_SELECTOR);
+      await page.type(PASSWORD_SELECTOR, password);
+      await page.click(LOGIN_BUTTON_SELECTOR);
+
+      console.log("typed password and clicked login");
+
+      // await page.waitForSelector(INVALID_LOGIN_ERROR_SELECTOR);
+      await page.waitForNetworkIdle();
+
+      //   TODO: handle wrong password here
+      const invalidLoginError = await page.evaluate(
+        (INVALID_LOGIN_ERROR_SELECTOR) => {
+          return document.querySelector(INVALID_LOGIN_ERROR_SELECTOR)
+            ?.innerText;
         },
-      };
+        INVALID_LOGIN_ERROR_SELECTOR
+      );
+
+      console.log("Invalid login error: ", invalidLoginError);
+      if (invalidLoginError) {
+        await browser.close();
+        return {
+          error: {
+            code: invalidLoginError
+              .trim()
+              .includes(INVALID_LOGIN_ERROR_MESSAGE.trim())
+              ? 401
+              : invalidLoginError
+                  .trim()
+                  .includes(CANT_VERIFY_USERNAME_ERROR_MESSAGE.trim())
+              ? 401
+              : 500,
+            exists: true,
+            message: invalidLoginError.replace("Go Home", ""),
+            possible_cause: invalidLoginError
+              .trim()
+              .includes(INVALID_LOGIN_ERROR_MESSAGE.trim())
+              ? "The password you entered is incorrect."
+              : invalidLoginError
+                  .trim()
+                  .includes(CANT_VERIFY_USERNAME_ERROR_MESSAGE.trim())
+              ? "You tried too many times."
+              : "The server might be experiencing some issues.",
+          },
+        };
+      }
+
+      // await page.waitForSelector(LOGOUT_BUTTON_SELECTOR); //This is to confirm that the user has logged in successfully
+      loginEndTime = Date.now();
+      console.log("Logged in successfully");
+
+      const cookiesObject = await page.cookies();
+
+      fs.writeFile(
+        `cookies/${username}.json`,
+        JSON.stringify(cookiesObject),
+        function (err) {
+          if (err) {
+            console.log("The session could not be saved.", err);
+          }
+          console.log("The session has been saved successfully.");
+        }
+      );
     }
 
-    const lockedOut = await page.evaluate((LOCKED_OUT_SELECTOR) => {
-      return document.querySelector(LOCKED_OUT_SELECTOR)?.innerText;
-    }, LOCKED_OUT_SELECTOR);
+    if (cookies) {
+      for (let cookie of cookies) {
+        await page.setCookie(cookie);
+      }
 
-    console.log("Locked out: ", lockedOut);
-    const currentUrl = page.url();
-    console.log("Current URL: ", currentUrl);
+      console.log(`${username} cookies have been set`);
 
-    // Check if the account is locked
+      await page.goto(ICAMPUS_LOGGED_IN_URL);
 
-    //   await page.waitForNavigation();
-    await page.waitForSelector(PASSWORD_SELECTOR);
-    await page.type(PASSWORD_SELECTOR, password);
-    await page.click(LOGIN_BUTTON_SELECTOR);
-
-    console.log("typed password and clicked login");
-
-    // await page.waitForSelector(INVALID_LOGIN_ERROR_SELECTOR);
-    await page.waitForNetworkIdle();
-
-    //   TODO: handle wrong password here
-    const invalidLoginError = await page.evaluate(
-      (INVALID_LOGIN_ERROR_SELECTOR) => {
-        return document.querySelector(INVALID_LOGIN_ERROR_SELECTOR)?.innerText;
-      },
-      INVALID_LOGIN_ERROR_SELECTOR
-    );
-
-    console.log("Invalid login error: ", invalidLoginError);
-    if (invalidLoginError) {
-      await browser.close();
-      return {
-        error: {
-          code: invalidLoginError
-            .trim()
-            .includes(INVALID_LOGIN_ERROR_MESSAGE.trim())
-            ? 401
-            : invalidLoginError
-                .trim()
-                .includes(CANT_VERIFY_USERNAME_ERROR_MESSAGE.trim())
-            ? 401
-            : 500,
-          exists: true,
-          message: invalidLoginError.replace("Go Home", ""),
-          possible_cause: invalidLoginError
-            .trim()
-            .includes(INVALID_LOGIN_ERROR_MESSAGE.trim())
-            ? "The password you entered is incorrect."
-            : invalidLoginError
-                .trim()
-                .includes(CANT_VERIFY_USERNAME_ERROR_MESSAGE.trim())
-            ? "You tried too many times."
-            : "The server might be experiencing some issues.",
-        },
-      };
+      loginEndTime = Date.now();
     }
-
-    // await page.waitForSelector(LOGOUT_BUTTON_SELECTOR); //This is to confirm that the user has logged in successfully
-    const loginEndTime = Date.now();
-    console.log("Logged in successfully");
 
     const fetchTimetableStartTime = Date.now();
     const timetablePageHtml = await page.evaluate(
@@ -176,6 +255,11 @@ async function scrapeTimetable(username, password) {
     console.log("Is timetable valid: ", isTimetableValid);
 
     if (!isTimetableValid) {
+      if (cookies) {
+        console.log("cookies might be invalid, delete them");
+        fs.unlinkSync(`cookies/${username}.json`);
+        return await scrapeTimetable(username, password);
+      }
       return {
         error: {
           exists: true,
@@ -186,6 +270,12 @@ async function scrapeTimetable(username, password) {
         },
       };
     }
+
+    const userFullname = await page.evaluate((USER_FULLNAME_SELECTOR) => {
+      return document.querySelector(USER_FULLNAME_SELECTOR)?.innerText;
+    }, USER_FULLNAME_SELECTOR);
+
+    console.log("User fullname: ", userFullname);
 
     const result = {
       timetable: timetable.map((course) => ({
@@ -200,16 +290,20 @@ async function scrapeTimetable(username, password) {
       error: {
         exists: false,
       },
+
+      user: {
+        full_name: userFullname,
+      },
     };
 
     //   console.log(JSON.stringify(result, null, 2));
 
     //CLOSE BROWSER
-    await browser.close();
+    if (!inDevelopment) await browser.close();
 
     return result;
   } catch (error) {
-    await browser.close();
+    if (!inDevelopment) await browser.close();
 
     throw error;
   }
