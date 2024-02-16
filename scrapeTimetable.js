@@ -1,6 +1,7 @@
 const puppeteer = require("puppeteer");
 const HtmlTableToJson = require("html-table-to-json");
 const fs = require("fs");
+const { saveCookies, retrieveCookies, deleteCookies } = require("./utils");
 require("dotenv").config();
 
 const inDevelopment = process.env.NODE_ENV === "development";
@@ -46,10 +47,10 @@ async function scrapeTimetable(username, password) {
   console.log("scraper started");
   let cookies = null;
   try {
-    cookies = JSON.parse(fs.readFileSync(`cookies/${username}.json`, "utf8"));
+    cookies = await retrieveCookies(username);
     console.log("cookies: ", cookies);
   } catch (error) {
-    console.log("No cookies available", error);
+    console.log("No cookies available or failed", error);
   }
   const browserLaunchStartTime = Date.now();
   const browser = await puppeteer.launch({
@@ -204,15 +205,21 @@ async function scrapeTimetable(username, password) {
 
       const cookiesObject = await page.cookies();
 
-      fs.writeFile(
-        `./cookies/${username}.json`,
-        JSON.stringify(cookiesObject),
-        function (err) {
-          if (err) {
-            console.log("The session could not be saved.", err);
-          } else console.log("The session has been saved successfully.");
-        }
-      );
+      // fs.writeFile(
+      //   `./cookies/${username}.json`,
+      //   JSON.stringify(cookiesObject),
+      //   function (err) {
+      //     if (err) {
+      //       console.log("The session could not be saved.", err);
+      //     } else console.log("The session has been saved successfully.");
+      //   }
+      // );
+      try {
+        const result = await saveCookies(username, cookiesObject);
+        console.log("Cookies have been saved", result);
+      } catch (error) {
+        console.log("could not save cookies", error);
+      }
     }
 
     if (cookies) {
@@ -256,7 +263,9 @@ async function scrapeTimetable(username, password) {
     if (!isTimetableValid) {
       if (cookies) {
         console.log("cookies might be invalid, delete them");
-        fs.unlinkSync(`cookies/${username}.json`);
+        await deleteCookies(username).catch((error) => {
+          console.log("could not delete cookies", error);
+        });
         return await scrapeTimetable(username, password);
       }
       return {
