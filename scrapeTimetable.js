@@ -260,7 +260,7 @@ async function scrapeTimetable(username, password) {
           code: 500,
           message: "The timetable could not be scraped.",
           possible_cause:
-            "iCampus has issues or my server is experiencing some issues.",
+            "iCampus may be Login issues.",
         },
       };
     }
