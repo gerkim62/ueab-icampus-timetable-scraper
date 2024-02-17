@@ -78,6 +78,8 @@ async function scrapeTimetable(username, password) {
     const page = await browser.newPage();
     console.log("did newPage()");
 
+    await page.setJavaScriptEnabled(false);
+
     // Define the resource types you want to block
     const blockedResourceTypes = [
       "stylesheet",
@@ -115,12 +117,15 @@ async function scrapeTimetable(username, password) {
       console.log("visited ICAMPUS_HOME_URL");
 
       await page.type(USERNAME_SELECTOR, username);
-      await page.click(AUTHENTICATE_BUTTON_SELECTOR);
+
+      // make the above two lines happen at the same time
+      await Promise.all([
+        page.waitForNavigation(),
+        page.click(AUTHENTICATE_BUTTON_SELECTOR),
+      ]);
 
       console.log("typed username and clicked authenticate");
-      await page.waitForNavigation({timeout:400}).catch((error) => {
-        console.log("could not wait for navigation", error);
-      });
+
       console.log("navigated");
 
       // console.log(await page.content());
