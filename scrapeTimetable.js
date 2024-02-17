@@ -118,6 +118,10 @@ async function scrapeTimetable(username, password) {
       await page.click(AUTHENTICATE_BUTTON_SELECTOR);
 
       console.log("typed username and clicked authenticate");
+      await page.waitForNavigation({timeout:400}).catch((error) => {
+        console.log("could not wait for navigation", error);
+      });
+      console.log("navigated");
 
       // console.log(await page.content());
 
