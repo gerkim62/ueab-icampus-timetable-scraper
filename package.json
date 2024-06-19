@@ -12,7 +12,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.2",
-    "express": "^4.18.2",
+    "express": "^4.19.2",
     "html-table-to-json": "^1.0.0",
     "puppeteer": "^22.11.2"
   }
